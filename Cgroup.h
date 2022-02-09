@@ -33,7 +33,7 @@ namespace cgroup
 		 std::string Name() override;
 		 void Set(std::string path, const ResourceConfig& res) override;
 		 void Apply(std::string groupName, int pid) override;
-		 void Remove(std::string path) override;
+		 void Remove(std::string groupName) override;
 	};
 
 	namespace V1
@@ -42,6 +42,7 @@ namespace cgroup
 		{
 		public:
 			explicit CgroupManager(std::string groupName);
+			~CgroupManager();
 			void Apply(int pid);
 			void Set(ResourceConfig res);
 			void Destroy();

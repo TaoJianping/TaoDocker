@@ -24,19 +24,6 @@ namespace
 			std::vector<std::string> v = absl::StrSplit(buf, absl::ByAnyChar(", "));
             if (subsystem == "cpu")
             {
-                if (v.back() == subsystem || v.back() == "cpuacct")
-                {
-                    std::string str = buf;
-                    std::vector<std::string> nv = absl::StrSplit(str, " ");
-                    if (nv.size() < 5) {
-                        throw std::runtime_error("out of index");
-                    }
-                    std::string res = std::string {nv.at(4)};
-                    printf("%s", res.data());
-                    return res;
-                }
-            } else
-            {
                 if (v.back() == subsystem)
                 {
                     if (v.size() < 5) {
@@ -57,17 +44,20 @@ namespace
             throw std::runtime_error("NOT FOUND cgroupRoot");
         }
 		auto path = std::filesystem::path(cgroupRoot) / cgroupName;
-		if (!std::filesystem::exists(path) && autoCreate)
+		if (std::filesystem::exists(path) || (!std::filesystem::exists(path) && autoCreate))
 		{
-			if (!std::filesystem::create_directories(path)) {
-				throw std::runtime_error("Failed to create cgroup " + path.string());
+			if (!std::filesystem::exists(path))
+			{
+				if (!std::filesystem::create_directories(path)) {
+					throw std::runtime_error("Failed to create cgroup " + path.string());
+				}
+				std::filesystem::permissions(path, std::filesystem::perms::all);
 			}
-			std::filesystem::permissions(path, std::filesystem::perms::all);
 			return path.string();
 		}
 		else
 		{
-			throw std::runtime_error("cgroup " + path.string() + " exists!");
+			throw std::runtime_error("cgroup path error");
 		}
 	};
 }
@@ -91,6 +81,11 @@ void cgroup::V1::CgroupManager::Apply(int pid)
 
 void cgroup::V1::CgroupManager::Destroy() {
 
+}
+
+cgroup::V1::CgroupManager::~CgroupManager()
+{
+	cpuSubSystem.Remove(groupName_);
 }
 
 std::string cgroup::CpuSubSystem::Name()
@@ -134,6 +129,13 @@ void cgroup::CpuSubSystem::Apply(std::string groupName, int pid)
     MyFile.close();
 }
 
-void cgroup::CpuSubSystem::Remove(std::string path) {
-
+void cgroup::CpuSubSystem::Remove(std::string groupName)
+{
+	auto subSystemCgroupPath = GetCgroupPath(Name(), groupName, false);
+	if (subSystemCgroupPath.empty()) {
+		throw std::runtime_error("subSystemCgroupPath Get Failed!");
+	}
+	if (!std::filesystem::remove(subSystemCgroupPath)) {
+		throw std::runtime_error("Failed To Delete Cgroup " + subSystemCgroupPath);
+	}
 }
