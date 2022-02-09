@@ -62,7 +62,8 @@ int Container::Run()
 			container_stack + STACK_SIZE,
 			CLONE_NEWUTS | CLONE_NEWIPC | CLONE_NEWPID | CLONE_NEWNS | SIGCHLD,
 			nullptr);
-	/* 等待子进程结束 */
+
+	// set cgroup
     auto res = cgroup::ResourceConfig {
             "",
             "20000",
@@ -71,6 +72,8 @@ int Container::Run()
     auto cgroupManager = cgroup::V1::CgroupManager{"TaoDockerTestCgroup"};
     cgroupManager.Set(res);
     cgroupManager.Apply(container_pid);
+
+	// wait
 	waitpid(container_pid, nullptr, 0);
 	printf("Parent - container stopped!\n");
 	return 0;
