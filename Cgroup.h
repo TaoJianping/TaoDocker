@@ -22,7 +22,7 @@ namespace cgroup
 	{
 	public:
 		virtual std::string Name() = 0;
-		virtual void Set(std::string path, ResourceConfig res) = 0;
+		virtual void Set(std::string path, const ResourceConfig& res) = 0;
 		virtual void Apply(std::string path, int pid) = 0;
 		virtual void Remove(std::string path) = 0;
 	};
@@ -31,8 +31,8 @@ namespace cgroup
 	{
 	public:
 		 std::string Name() override;
-		 void Set(std::string path, ResourceConfig res) override;
-		 void Apply(std::string path, int pid) override;
+		 void Set(std::string path, const ResourceConfig& res) override;
+		 void Apply(std::string groupName, int pid) override;
 		 void Remove(std::string path) override;
 	};
 

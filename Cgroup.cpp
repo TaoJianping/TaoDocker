@@ -22,13 +22,29 @@ namespace
 		while (getline(ifs, buf))
 		{
 			std::vector<std::string> v = absl::StrSplit(buf, absl::ByAnyChar(", "));
-			if (v.back() == subsystem)
-			{
-				if (v.size() < 5) {
-					throw std::runtime_error("out of index");
-				}
-				return v.at(4);
-			}
+            if (subsystem == "cpu")
+            {
+                if (v.back() == subsystem || v.back() == "cpuacct")
+                {
+                    std::string str = buf;
+                    std::vector<std::string> nv = absl::StrSplit(str, " ");
+                    if (nv.size() < 5) {
+                        throw std::runtime_error("out of index");
+                    }
+                    std::string res = std::string {nv.at(4)};
+                    printf("%s", res.data());
+                    return res;
+                }
+            } else
+            {
+                if (v.back() == subsystem)
+                {
+                    if (v.size() < 5) {
+                        throw std::runtime_error("out of index");
+                    }
+                    return v.at(4);
+                }
+            }
 		}
 
 		return std::string {};
@@ -36,7 +52,10 @@ namespace
 
 	std::string GetCgroupPath(const std::string& subsystem, const std::string& cgroupName, bool autoCreate)
 	{
-		auto cgroupRoot = FindCgroupMountPoint(subsystem);
+		std::string cgroupRoot = FindCgroupMountPoint(subsystem);
+        if (cgroupRoot.empty()) {
+            throw std::runtime_error("NOT FOUND cgroupRoot");
+        }
 		auto path = std::filesystem::path(cgroupRoot) / cgroupName;
 		if (!std::filesystem::exists(path) && autoCreate)
 		{
@@ -61,7 +80,17 @@ cgroup::V1::CgroupManager::CgroupManager(std::string groupName): groupName_(std:
 
 void cgroup::V1::CgroupManager::Set(cgroup::ResourceConfig res)
 {
-	cpuSubSystem.Set(groupName_, std::move(res));
+    // CPU Controller
+	cpuSubSystem.Set(groupName_, res);
+}
+
+void cgroup::V1::CgroupManager::Apply(int pid)
+{
+    cpuSubSystem.Apply(groupName_, pid);
+}
+
+void cgroup::V1::CgroupManager::Destroy() {
+
 }
 
 std::string cgroup::CpuSubSystem::Name()
@@ -69,7 +98,7 @@ std::string cgroup::CpuSubSystem::Name()
 	return "cpu";
 }
 
-void cgroup::CpuSubSystem::Set(std::string groupName, cgroup::ResourceConfig res)
+void cgroup::CpuSubSystem::Set(std::string groupName, const cgroup::ResourceConfig& res)
 {
 	auto subSystemCgroupPath = GetCgroupPath(Name(), groupName, true);
 	if (subSystemCgroupPath.empty()) {
@@ -79,9 +108,32 @@ void cgroup::CpuSubSystem::Set(std::string groupName, cgroup::ResourceConfig res
 		throw std::runtime_error("CpuShare Not Set!");
 	}
 	// TODO 我就写死了，以后可以完善
-	auto cpuSharePath = std::filesystem::path(subSystemCgroupPath) / "cpu.shares";
+	auto cpuSharePath = std::filesystem::path(subSystemCgroupPath) / "cpu.cfs_quota_us";
 	std::ofstream MyFile(cpuSharePath.string());
+    if (!MyFile.is_open()) {
+        throw std::runtime_error("File Open Failed!");
+    }
 	MyFile << "20000";
 	// Close the file
 	MyFile.close();
+}
+
+void cgroup::CpuSubSystem::Apply(std::string groupName, int pid)
+{
+    auto subSystemCgroupPath = GetCgroupPath(Name(), groupName, false);
+    if (subSystemCgroupPath.empty()) {
+        throw std::runtime_error("subSystemCgroupPath Get Failed!");
+    }
+    auto taskFile = std::filesystem::path(subSystemCgroupPath) / "tasks";
+    std::ofstream MyFile(taskFile.string());
+    if (!MyFile.is_open()) {
+        throw std::runtime_error("File Open Failed!");
+    }
+    MyFile << pid;
+    // Close the file
+    MyFile.close();
+}
+
+void cgroup::CpuSubSystem::Remove(std::string path) {
+
 }
